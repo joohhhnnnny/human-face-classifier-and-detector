@@ -124,8 +124,4 @@ else:  # YOLOv8 live webcam
         # Update the image in the centered placeholder
         stframe.image(annotated_frame, channels="RGB", width=frame_width)
 
-        # Stop if user closes the app or presses 'q' (optional)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    cap.release()
+        # Stop if user
