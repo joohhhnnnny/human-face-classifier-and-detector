@@ -1,201 +1,101 @@
 import streamlit as st
 import tensorflow as tf
 from PIL import Image, ImageOps
+from ultralytics import YOLO
 import numpy as np
+import os
 
-# PAGE CONFIG
-st.set_page_config(
-    page_title="Human vs Non-Human Detector",
-    page_icon="👤",
-    layout="wide"
-)
+# ───────────────────── PAGE CONFIG ─────────────────────
+st.set_page_config(page_title="Human vs Non-Human Detector", page_icon="👤", layout="wide")
 
-# SIDEBAR THEME SELECTION
-st.sidebar.header("Appearance")
-theme = st.sidebar.radio("Choose theme:", ["Light ☀️", "Dark 🌙"], index=0)
+# ───────────────────── THEME ─────────────────────
+st.markdown("<h1 style='text-align:center;'>Human Face Classifier and Detector</h1>", unsafe_allow_html=True)
 
-# THEME COLORS
-if theme == "Light ☀️":
-    primary_bg = "#eef1f6"
-    card_bg = "#ffffff"
-    text_color = "#1c2333"
-    title_color = "#1c2333"
-    button_bg1 = "#4A73FF"
-    button_bg2 = "#3358E0"
-    preview_bg = "#f9fafc"
-    progress_color = "#4A73FF"
-else:
-    primary_bg = "#0f1116"
-    card_bg = "#1a1c23"
-    text_color = "#e5e7eb"
-    title_color = "#ffffff"
-    button_bg1 = "#6366f1"
-    button_bg2 = "#4f46e5"
-    preview_bg = "#111317"
-    progress_color = "#6366f1"
-
-# CSS STYLING
-st.markdown(f"""
-<style>
-
-html, body, [class*="css"] {{
-    font-family: 'Inter', sans-serif;
-}}
-
-.stApp {{
-    background-color: {primary_bg};
-}}
-
-/* FIX — force title color change in dark mode */
-h1.main-title, .main-title, .main-title h1 {{
-    color: {title_color} !important;
-    text-align: center !important;
-    padding-top: 20px;
-}}
-
-.card {{
-    background: {card_bg};
-    padding: 25px 30px;
-    border-radius: 16px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
-    margin-bottom: 25px;
-    color: {text_color};
-}}
-
-.stButton>button {{
-    width: 100%;
-    background: linear-gradient(135deg, {button_bg1}, {button_bg2});
-    color: white;
-    border-radius: 10px;
-    padding: 10px;
-    border: none;
-    font-weight: 600;
-    transition: 0.2s ease-in-out;
-}}
-
-.stButton>button:hover {{
-    transform: scale(1.03);
-    background: linear-gradient(135deg, {button_bg2}, {button_bg1});
-}}
-
-.preview-box {{
-    border: 2px dashed #4d5561;
-    border-radius: 16px;
-    padding: 12px;
-    background: {preview_bg};
-}}
-
-h2, h3, label, p, span, .stMetric {{
-    color: {text_color} !important;
-}}
-
-/* Transparent sidebar */
-[data-testid="stSidebar"], .stSidebar {{
-    background: rgba(0,0,0,0) !important;
-    box-shadow: none !important;
-}}
-
-.stProgress > div > div > div > div {{
-    background-color: {progress_color};
-}}
-
-/* Section divider fix */
-.section-divider {{
-    margin: 20px 0;
-    border-top: 1px solid #4d5561;
-}}
-
-</style>
-""", unsafe_allow_html=True)
-
-# PAGE TITLE
-st.markdown("<h1 class='main-title'>Human vs Non-Human Detector</h1>", unsafe_allow_html=True)
-st.write("This AI checks if your photo contains a human. Friendly, fast, and surprisingly honest.")
-st.markdown("<div class='section-divider'></div>", unsafe_allow_html=True)
-
-# MODEL SELECTION SIDEBAR
+# ───────────────────── MODEL SELECTION ─────────────────────
 st.sidebar.header("Model Selection")
-
 model_choice = st.sidebar.radio(
-    "Choose which AI model to use:",
-    ["MobileNetV2", "YoloV8"],
-    index=0
+    "Choose AI model:", ["MobileNetV2", "YoloV8"], index=0, key="model_radio"
 )
 
 MODEL_PATHS = {
-    "MobileNetV2": "human_classifier_model.keras",
-    "YoloV8": "human_classifier_yolov8.keras" #FOR THE CHAR
+    "MobileNetV2": "./models/mobilenetv2.h5",
+    "YoloV8": "./models/best-yolov8s-v2.pt"
 }
 
+# ───────────────────── LOAD MODELS ─────────────────────
 @st.cache_resource
-def load_selected_model(model_path):
-    return tf.keras.models.load_model(model_path)
+def load_mobilenet_model(path):
+    if not os.path.exists(path):
+        st.error(f"MobileNetV2 model not found at:\n{path}")
+        st.stop()
+    return tf.keras.models.load_model(path)
+
+@st.cache_resource
+def load_yolo_model(path):
+    if not os.path.exists(path):
+        st.error(f"YOLOv8 model not found at:\n{path}")
+        st.stop()
+    return YOLO(path)
 
 with st.spinner(f"Loading {model_choice}..."):
     try:
-        model = load_selected_model(MODEL_PATHS[model_choice])
+        if model_choice == "MobileNetV2":
+            model = load_mobilenet_model(MODEL_PATHS["MobileNetV2"])
+        else:
+            model = load_yolo_model(MODEL_PATHS["YoloV8"])
     except Exception as e:
-        st.error(f"Error loading model: {e}")
+        st.error(f"Error loading model:\n{e}")
         st.stop()
 
-# FIXED CONFIDENCE THRESHOLD (since slider removed)
-confidence_threshold = 0.70
-
-# PREDICTION FUNCTION
-def import_and_predict(image_data, model):
+# ───────────────────── MOBILENETV2 PREDICTION ─────────────────────
+def predict_mobilenet(image_data, model):
     image_data = image_data.convert("RGB")
+    image = ImageOps.fit(image_data, (224, 224), Image.Resampling.LANCZOS)
+    img = np.asarray(image) / 255.0
+    img = np.expand_dims(img, axis=0)
+    prediction = model.predict(img)
+    return prediction[0][0]
 
-    size = (224, 224)
-    image = ImageOps.fit(image_data, size, Image.Resampling.LANCZOS)
-    img = np.asarray(image)
+# ───────────────────── YOLO IMAGE DETECTION ─────────────────────
+def detect_yolo_image(image, model):
+    image_np = np.array(image)
+    results = model(image_np)
+    return results[0].plot()
 
-    img = img / 255.0
-    img_reshape = np.expand_dims(img, axis=0)
-
-    prediction = model.predict(img_reshape)
-    return prediction
-
-# MAIN UI
-st.markdown("<div class='card'>", unsafe_allow_html=True)
-file = st.file_uploader("Upload a photo", type=["jpg", "png", "jpeg"])
-st.markdown("</div>", unsafe_allow_html=True)
-
-if file is None:
-    st.info("Upload a photo to begin.")
-else:
-    col1, col2 = st.columns(2, gap="large")
-
-    with col1:
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        st.subheader("Uploaded Image")
-
+# ───────────────────── MAIN UI ─────────────────────
+if model_choice == "MobileNetV2":
+    file = st.file_uploader("Upload a photo", type=["jpg", "png", "jpeg"], key="mobilenet_uploader")
+    if file:
         image = Image.open(file)
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.image(image, caption="Uploaded Image", width=400)
 
-        st.markdown("<div class='preview-box'>", unsafe_allow_html=True)
-        st.image(image, use_column_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+        if st.button("Analyze Image", key="mobilenet_button"):
+            probability = predict_mobilenet(image, model)
+            human_prob = 1 - probability
+            non_human_prob = probability
 
-        st.markdown("</div>", unsafe_allow_html=True)
+            st.metric("Human Probability", f"{human_prob:.2%}")
+            st.metric("Non-Human Probability", f"{non_human_prob:.2%}")
 
-    with col2:
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        st.subheader("AI Analysis")
+            if human_prob > non_human_prob:
+                st.success("Result: HUMAN")
+            else:
+                st.error("Result: NON-HUMAN")
 
-        if st.button("Analyze Image"):
-            with st.spinner("Analyzing..."):
+            st.progress(int(human_prob * 100))
 
-                predictions = import_and_predict(image, model)
-                probability = predictions[0][0]
+else:  # YOLO
+    file = st.file_uploader("Upload an image for YOLO detection", type=["jpg", "png", "jpeg"], key="yolo_uploader")
+    if file:
+        image = Image.open(file).convert("RGB")
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.image(image, caption="Original Image", width=600)
 
-                is_human_prob = 1 - probability
-
-                if is_human_prob > confidence_threshold:
-                    st.success("Result: HUMAN 👤")
-                    st.metric("Confidence", f"{is_human_prob:.2%}")
-                    st.progress(int(is_human_prob * 100))
-                else:
-                    st.error("Result: NON-HUMAN 🚫")
-                    st.metric("Confidence", f"{(1 - is_human_prob):.2%}")
-                    st.progress(int((1 - is_human_prob) * 100))
-
-        st.markdown("</div>", unsafe_allow_html=True)
+        if st.button("Run YOLO Detection", key="yolo_button"):
+            with st.spinner("Detecting..."):
+                annotated_image = detect_yolo_image(image, model)
+            with col2:
+                st.image(annotated_image, caption="YOLO Detection Result", width=600)
