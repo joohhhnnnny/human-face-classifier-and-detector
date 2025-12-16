@@ -150,7 +150,7 @@ if file:
         st.markdown("<div class='card'>", unsafe_allow_html=True)
         st.subheader("Uploaded Image")
         st.markdown("<div class='preview-box'>", unsafe_allow_html=True)
-        st.image(image, width="stretch")
+        st.image(image, width=600)
         st.markdown("</div></div>", unsafe_allow_html=True)
 
     with col2:
@@ -179,7 +179,7 @@ if file:
                     else:
                         st.warning("No humans detected")
 
-                    st.image(annotated_img, width="stretch")
+                    st.image(annotated_img, width=600)
 
         st.markdown("</div>", unsafe_allow_html=True)
 else:
