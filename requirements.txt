@@ -1,5 +1,5 @@
 streamlit==1.28.0
-tensorflow-cpu==2.12.0  # matches older Keras 2.x format
+tensorflow-cpu==2.15.0
 numpy==1.24.0
 pillow==10.1.0
 opencv-python-headless==4.8.1.78
