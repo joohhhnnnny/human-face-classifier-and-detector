@@ -248,6 +248,14 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ---
 
+## Project Contributors
+
+- John Benedict Bongcac
+- John Mhel Dalumpines
+- Julie Anne Pesaña
+
+---
+
 <p align="center">
   Made with ❤️ for Computer Vision
 </p>
